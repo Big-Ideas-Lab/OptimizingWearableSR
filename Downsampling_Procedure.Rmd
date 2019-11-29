@@ -1,0 +1,263 @@
+---
+title: "Downsampling_Procedure"
+author: "BrinnaeBent"
+output: html_document
+---
+
+#Change ID of participant below:
+```{r}
+subid <- 'ID-###'
+```
+
+```{r}
+## LIBRARIES
+library(zoo) #Use as.zoo to create zoo objects for further manipulation
+library(anytime) #Converts time from unix to UTC
+library(rlist) #Allows index removal from list with list.remove
+library(MALDIquant) #Allows necessary relaxed matching with match.closest
+library(kza) #Kolmogorev-Zurbenko Filter
+library(dplyr) #filtering, 
+```
+
+
+```{r}
+# Get data frame with indices and values of what to remove from PPG file. (Based on Empatica motion artifact algorithm)
+
+filepath = sprintf("filepath\\%s", subid)
+  
+  
+timedata <- read.csv("filepath\\skintonestudyTIMES.csv", header=TRUE, stringsAsFactors = FALSE)
+  
+  #If this gives you an error while running, restart environment and/or re-install dlyr package
+idtime <- filter(timedata, timedata$ï..Subject.ID==subid)
+  
+thisistime <- as.numeric(strptime(as.character(idtime$Baseline.Start.1), format='%m/%d/%Y %H:%M:%S'))
+
+
+##LOAD DATA
+#PPG (BVP)
+PPG <- read.csv(sprintf("%s\\Empatica\\BVP.csv", filepath), header=FALSE)
+startTimepre <- PPG[1,]
+startTimePPG <- anytime(startTimepre)
+sampleRatePPG <- PPG[2,]
+PPG <- PPG[-c(1,2), ]
+
+secondspassedPPG <- length(PPG)/sampleRatePPG
+endTimeprePPG <- startTimepre + secondspassedPPG
+endTimePPG <- anytime(endTimeprePPG)
+PPGtime <- as.numeric(seq(from=startTimepre, to=endTimeprePPG, length.out=length(PPG)))
+
+#Loads in IBI.csv file
+IBI <- read.csv(sprintf("%s\\Empatica\\IBI.csv", filepath), header=TRUE)
+IBItimes <- startTimepre + IBI[,1]
+
+xx = thisistime #CHANGE- START timestamp
+indexx <- c(xx)
+indexy <- c(xx+300) #Set to 5 mins (300 seconds)
+
+i1 <- match.closest(indexx, PPGtime, tolerance=Inf)
+i2 <- match.closest(indexy, PPGtime, tolerance=Inf)
+
+PPG1 <- PPG[i1:i2]
+PPGtime1 <- PPGtime[i1:i2]
+
+
+i11 <- match.closest(indexx, IBItimes, tolerance=Inf)
+i22 <- match.closest(indexy, IBItimes, tolerance=Inf)
+
+IBI1 <- IBI[i11:i22,2]
+IBItimes1 <- IBItimes[i11:i22]
+
+
+timess <- seq(from=0, to=300, length.out=length(PPG1)) #Set to 5 mins (300 seconds)
+
+```
+
+
+#DOWNSAMPLING ANALYSIS
+
+```{r}
+##FIND DIFFERENCES IN TIMES BETWEEN IBI VALUES
+IBIsub <- diff(IBItimes1) #Find differences between subsequent times
+
+ss <- ifelse (IBIsub>2, ss<- index(IBIsub), ss<-0) #gives you value of index
+st <- ifelse (IBIsub>2, st <- IBIsub, st<-0) # gives you # of values in a row to remove
+isub <- IBItimes1[ss] #Time at start of each data removal
+
+#Neaten up and remove extraneuous zeros
+ss <- ss[ ss != 0 ]
+st <- st[st != 0]
+
+# Create data frame
+s <- data.frame(ss, st, isub)
+
+## REMOVE DATA FROM PPG RAW
+start <- numeric()
+end <- numeric()
+seqlist <- numeric()
+
+# Creating start and end vectors for each set of data that needs to be removed
+for (val in 1:length(ss)){
+  start <- append(start, isub[val])
+  end <- append(end, isub[val] + st[val])
+}
+
+#Creates numeric of all timestamps to remove from PPG based on Empatica motion detection algorithm
+for (val in 1:(length(start)-1)){
+  range <- seq(start[val], end[val])
+  seqlist <- append(seqlist, range) #all timestamps to be removed from the PPG data
+}
+
+repeats = 0
+```
+
+```{r}
+#Loop that repeats through (sampling rate=64Hz) 64 times, removing values that are in both seqlist and PPGtime (creates indexes and then removes them from PPG and PPGtime lists using list.remove)
+repeat {
+  indexes <- match.closest(seqlist, PPGtime1, tolerance=Inf) #allows relaxed matching
+  PPGtime1 <- list.remove(PPGtime1, range=indexes)
+  PPG1 <- list.remove(PPG1, range=indexes)
+  timess <- list.remove(timess, range=indexes)
+  repeats = repeats + 1
+  if(repeats==64){ #sampling rate=64Hz
+    break
+  }
+
+}
+```
+
+
+```{r}
+library(signal)
+PPG_32 <- decimate(PPG1, 2)
+PPG_t_32 <- decimate(timess, 2)
+PPG_21 <- decimate(PPG1,3)
+PPG_t_21 <- decimate(timess,3)
+PPG_16 <- decimate(PPG1,4)
+PPG_t_16 <- decimate(timess,4)
+PPG_12.8 <- decimate(PPG1, 5)
+PPG_t_12.8 <- decimate(timess, 5)
+PPG_10.67 <- decimate(PPG1, 6)
+PPG_t_10.67 <- decimate(timess, 6)
+PPG_9 <- decimate(PPG1, 7)
+PPG_t_9 <- decimate(timess, 7)
+PPG_8 <- decimate(PPG1, 8)
+PPG_t_8 <- decimate(timess, 8)
+PPG_7.1 <- decimate(PPG1,9)
+PPG_t_7.1 <- decimate(timess,9)
+PPG_6.4 <- decimate(PPG1, 10)
+PPG_t_6.4 <- decimate(timess, 10)
+PPG_5.8 <- decimate(PPG1, 11)
+PPG_t_5.8 <- decimate(timess, 11)
+PPG_5.3 <- decimate(PPG1, 12)
+PPG_t_5.3 <- decimate(timess, 12)
+PPG_4.9 <- decimate(PPG1,13)
+PPG_t_4.9 <- decimate(timess,13)
+PPG_4.6 <- decimate(PPG1,14)
+PPG_t_4.6 <- decimate(timess,14)
+PPG_4.3 <- decimate(PPG1, 15)
+PPG_t_4.3 <- decimate(timess,15)
+PPG_4 <- decimate(PPG1, 16)
+PPG_t_4 <- decimate(timess, 16)
+PPG_3.6 <- decimate(PPG1, 18)
+PPG_t_3.6 <- decimate(timess, 18)
+PPG_2 <- decimate(PPG1, 32)
+PPG_t_2 <- decimate(timess, 32)
+PPG_1 <- decimate(PPG1, 64)
+PPG_t_1 <- decimate(timess, 64)
+```
+
+```{r}
+capOutliers <- function(x){
+   qnt <- quantile(x, probs=c(.25, .75), na.rm = T)
+   caps <- quantile(x, probs=c(.25, .75), na.rm = T)
+   H <- 1.5 * IQR(x, na.rm = T)
+   x[x < (qnt[1] - H)] <- caps[1]
+   x[x > (qnt[2] + H)] <- caps[2]
+   return(x)
+}
+```
+
+```{r}
+
+capOutRange <- function(x){
+  x[x < 0.24] <- 0.3 #Remove anything equivalent to less than 20bpm
+  x[x > 2] <- 2 #Remove anything equivalent to greater than 250bpm
+  return(x)
+}
+
+```
+
+
+
+
+```{r}
+
+PPG_IBI <- function(presignal, presignaltime, samplerate, subid){
+  library(kza)
+  library(zoo)
+
+
+  ##OUTLIERS
+  #Outliers
+  outliers <- boxplot(presignal, plot=FALSE)$out
+  signal <- presignal[-which(presignal %in% outliers)]
+
+
+  #KMZ FILTER
+  #Kolmogorov-Zurbenko low-pass linear filter
+  signal <- kz(signal, m=3, k=30)
+
+
+
+  #DETECT IBI VALUES
+  #Minima Detector
+  zoosig <- as.zoo(signal)
+  rwm <- rollapply(zoosig, 3, function(x) which.min(x)==2) #optimize settings
+  index <- index(rwm)[coredata(rwm)]
+
+
+  #Error correction HERE
+  index <- index[signal[index] < median(signal)]
+  stmin <- presignaltime[index]
+
+  #Calculate IBI values
+  IBIp <- diff(index)
+  IBIl <- IBIp/samplerate
+  IBIl <- IBIl 
+  
+  IBIl <- capOutliers(IBIl)
+
+  df = data.frame(stmin[1:length(stmin)-1], IBIl)
+  
+  csvFileName <- sprintf("%sHz_IBI.csv", samplerate)
+  write.csv(df, file = csvFileName, append=FALSE,row.names=FALSE) #Change NAME of file
+  
+}
+
+```
+
+
+```{r}
+PPG_IBI(PPG1, timess, 64)
+PPG_IBI(PPG_32, PPG_t_32, 32)
+PPG_IBI(PPG_21, PPG_t_21, 21)
+PPG_IBI(PPG_16, PPG_t_16, 16)
+PPG_IBI(PPG_12.8, PPG_t_12.8, 12.8)
+PPG_IBI(PPG_10.67, PPG_t_10.67, 10.67)
+PPG_IBI(PPG_9, PPG_t_9, 9.14)
+PPG_IBI(PPG_8, PPG_t_8, 8)
+PPG_IBI(PPG_7.1, PPG_t_7.1, 7.1)
+PPG_IBI(PPG_6.4, PPG_t_6.4, 6.4)
+PPG_IBI(PPG_5.8, PPG_t_5.8, 5.8)
+PPG_IBI(PPG_5.3, PPG_t_5.3, 5.3)
+PPG_IBI(PPG_4.9, PPG_t_4.9, 4.9)
+PPG_IBI(PPG_4.6, PPG_t_4.6, 4.6)
+PPG_IBI(PPG_4.3, PPG_t_4.3, 4.3)
+PPG_IBI(PPG_4, PPG_t_4, 4)
+PPG_IBI(PPG_3.6, PPG_t_3.6, 3.6)
+PPG_IBI(PPG_2, PPG_t_2, 2)
+PPG_IBI(PPG_1, PPG_t_1, 1)
+
+```
+
